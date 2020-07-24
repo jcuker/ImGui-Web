@@ -60,6 +60,7 @@ export class ImElement {
     children?: number[];
 
 
+    htmlDivElement?: HTMLDivElement;
 
 
     layout: LayoutFunctionPtr = (p, c) => { };
@@ -86,7 +87,7 @@ export class ImRectElement extends ImElement {
     }
 }
 
-export type ImStackOrientation = 'vertial' | 'horizontal';
+export type ImStackOrientation = 'vertical' | 'horizontal';
 export interface ImStackParams extends ImElementParams {
     orientation: ImStackOrientation;
 }

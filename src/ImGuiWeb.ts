@@ -4,7 +4,7 @@ import { simpleLayout } from "./ImGuiWebLayoutFunctions";
 
 export default class ImGui {
   private readonly config: ImConfig;
-  private readonly rootDOMElement: HTMLElement;
+  private readonly rootHTMLElement: HTMLDivElement;
   private readonly rootImElement: ImElement;
 
   constructor(domId: string, canvasSize: Vec2<number>, debug: boolean = true) {
@@ -16,14 +16,8 @@ export default class ImGui {
       debug
     };
 
-    const attemptedQuery = document.getElementById(domId);
-    if (!attemptedQuery) {
-      console.error('Unable to find a node with the specified id.');
-    }
-
-    this.rootDOMElement = attemptedQuery as HTMLElement;
-    this.rootDOMElement.setAttribute('style', `height: ${canvasSize.y}px; width: ${canvasSize.x}px;`);
-    this.rootImElement = this.constructRootElement();
+    this.rootHTMLElement = this.constructRootDOMElement(domId);
+    this.rootImElement = this.constructRootImElement();
   }
 
   // called to start compiling elements
@@ -42,38 +36,50 @@ export default class ImGui {
     for (const childIdx of this.rootImElement.children) {
       const child = this.config.elements[childIdx];
       if (!child.hasPerformedLayout) child.layout(this.rootImElement, child);
-      this.draw(child);
+      this.draw(this.rootImElement, child);
     }
+
+    this.log('End is finished: Children of root: ', this.rootHTMLElement.childElementCount);
+    this.log('# elements: ', this.config.elements.length);
+    this.log('# elements in stack: ', this.config.elementStack.length);
   }
 
-  private getCurrentContainerElement() {
+  private getCurrentContainerElement(): number {
     return this.config.elementStack[this.config.elementStack.length - 1];
   }
 
-  private popCurrentContainerElement() {
-    const currContainer = this.config.elementStack[this.config.elementStack.length - 1];
+  private popCurrentContainerElement(): number {
+    const currContainerIdx = this.config.elementStack[this.config.elementStack.length - 1];
     this.config.elementStack.pop();
-    return currContainer;
+    return currContainerIdx;
   }
 
   // Draws an element and recursively draws its children. MUST be called AFTER Layout
-  private draw(element: ImElement) {
-    const elementAsDOMNode = this.convertImElementToDOMNode(element);
-    this.appendDOMNodeToDocument(elementAsDOMNode);
+  private draw(parent: ImElement, element: ImElement) {
+    const elementAsHTMLDiv = element.htmlDivElement
+      ? element.htmlDivElement
+      : this.convertImElementToHTMLDiv(element);
+
+    this.appendHTMLDivToHTMLElement(parent.htmlDivElement, elementAsHTMLDiv);
 
     if (element.children) {
       for (const childIdx of element.children) {
         const child = this.config.elements[childIdx];
-        this.draw(child);
+        this.draw(element, child);
       }
     }
   }
 
   private freshPaint() {
-    while (this.rootDOMElement.firstChild) {
+    this.log('Cleaning the root element. Children#: ', this.rootHTMLElement.childElementCount);
+    while (this.rootHTMLElement.firstChild) {
       // if there is a first there is a last
-      this.rootDOMElement.removeChild(this.rootDOMElement.lastChild as ChildNode);
+      this.rootHTMLElement.removeChild(this.rootHTMLElement.lastChild as ChildNode);
     }
+    this.log('While first, remove last. Children#: ', this.rootHTMLElement.childElementCount);
+
+    // clean root im element
+    this.rootImElement.children = [];
   }
 
   // all elements MUST have a parent. The only exception is the RootElement
@@ -111,7 +117,7 @@ export default class ImGui {
   }
 
   public endStack() {
-    this.config.elementStack.pop();
+    this.popCurrentContainerElement();
   }
 
   /**
@@ -121,20 +127,33 @@ export default class ImGui {
  * @param parent reference to parent container
  * @param self reference to self
  */
-  private stackLayout(parent: ImElement, self: ImElement): void {
+  private stackLayout = (parent: ImElement, self: ImStack): void => {
     let heightSum = 0;
     let widthSum = 0;
 
-    for (const childIdx of self.children) {
-      const child = this.config.elements[childIdx];
-      child.layout(self, child);
+    if (self.orientation === 'vertical') {
+      for (const childIdx of self.children) {
+        const child = this.config.elements[childIdx];
+        child.layout(self, child);
 
-      heightSum += child.calculatedHeight;
-      widthSum += child.calculatedWidth;
+        heightSum += child.calculatedHeight;
+        widthSum += child.calculatedWidth;
+      }
+
+      self.calculatedHeight = heightSum;
+      self.calculatedWidth = widthSum;
+    } else {
+      for (const childIdx of self.children) {
+        const child = this.config.elements[childIdx];
+        child.layout(self, child);
+
+        heightSum += child.calculatedHeight;
+        widthSum += child.calculatedWidth;
+      }
+
+      self.calculatedHeight = heightSum;
+      self.calculatedWidth = widthSum;
     }
-
-    self.calculatedHeight = heightSum;
-    self.calculatedWidth = widthSum;
 
     self.absRect = {
       x1: parent.absRect.x1,
@@ -146,7 +165,18 @@ export default class ImGui {
     self.hasPerformedLayout = true;
   }
 
-  private constructRootElement() {
+  private constructRootDOMElement(domId: string): HTMLDivElement {
+    const attemptedQuery = document.getElementById(domId);
+    if (!attemptedQuery) {
+      console.error('Unable to find a node with the specified id.');
+    }
+
+    const rootHTMLElement = attemptedQuery as HTMLDivElement;
+    rootHTMLElement.setAttribute('style', `height: ${this.config.canvasSize.y}px; width: ${this.config.canvasSize.x}px;`);
+    return rootHTMLElement;
+  }
+
+  private constructRootImElement(): ImElement {
     const rootElement: ImElement = new ImElement({
       id: 'ImGuiWeb-Root',
       height: constructSizeType(this.config.canvasSize.x, 'px'),
@@ -162,23 +192,25 @@ export default class ImGui {
     rootElement.hasPerformedLayout = true;
     rootElement.children = [];
     rootElement.elementIdx = 0;
+    rootElement.htmlDivElement = this.rootHTMLElement;
 
     return rootElement;
   }
 
-  private convertImElementToDOMNode(element: ImElement): Node {
-    const domElement = document.createElement('div');
+  private convertImElementToHTMLDiv(element: ImElement): HTMLDivElement {
+    const htmlDivElement = document.createElement('div');
     let styleStr = `height: ${element.height.val}${element.height.unit}; width: ${element.width.val}${element.width.unit};`;
     if (element.backgroundColor) {
       styleStr += `background: ${element.backgroundColor}`;
     }
-    domElement.setAttribute('style', styleStr);
-    domElement.setAttribute('id', element.id);
-    return domElement;
+    htmlDivElement.setAttribute('style', styleStr);
+    htmlDivElement.setAttribute('id', element.id);
+    element.htmlDivElement = htmlDivElement;
+    return htmlDivElement;
   }
 
-  private appendDOMNodeToDocument(node: Node): void {
-    this.rootDOMElement.appendChild(node);
+  private appendHTMLDivToHTMLElement(parent: HTMLElement, div: HTMLDivElement): void {
+    parent.appendChild(div);
   }
 
   private log(message?: any, ...optionalParams: any[]): void {

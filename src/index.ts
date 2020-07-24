@@ -1,7 +1,5 @@
 import ImGuiWeb from './ImGuiWeb';
-import ImGui from './ImGuiWeb';
 import { constructSizeType } from './ImGuiHelpers';
-
 
 window.onload = () => {
     const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 }, false);
@@ -38,12 +36,26 @@ window.onload = () => {
 
         if (playing) {
             ImGuiInstance.begin();
-            ImGuiInstance.rect({
+            ImGuiInstance.beginStack({
+                id: 'vStack',
                 height: constructSizeType(50, 'px'),
                 width: constructSizeType(50, 'px'),
+                orientation: 'vertical',
+                backgroundColor: '#eee'
+            });
+            ImGuiInstance.rect({
+                height: constructSizeType(25, 'px'),
+                width: constructSizeType(25, 'px'),
                 id: 'test',
                 backgroundColor: 'red'
             });
+            ImGuiInstance.rect({
+                height: constructSizeType(25, 'px'),
+                width: constructSizeType(25, 'px'),
+                id: 'test1',
+                backgroundColor: 'blue'
+            });
+            ImGuiInstance.endStack();
             ImGuiInstance.end();
             fpsDisplay.textContent = Math.round(fps) + ' FPS'; // display the FPS
         }
