@@ -1,23 +1,30 @@
-import { ImConfig, Vec2, ImElement, ImRectElementParams, ImStack, ImStackParams, Rect } from "./ImGuiWebTypes";
-import { constructSizeType } from "./ImGuiHelpers";
+import { ImConfig, Vec2, ImElement, ImRectElementParams, ImStack, ImStackParams, Rect, ImGuiState, ImGuiGestureSystem } from "./ImGuiWebTypes";
+import { constructSizeType, constructSyleString } from "./ImGuiHelpers";
 import { simpleLayout } from "./ImGuiWebLayoutFunctions";
 
 export default class ImGui {
   private readonly config: ImConfig;
   private readonly rootHTMLElement: HTMLDivElement;
   private readonly rootImElement: ImElement;
+  private readonly state: ImGuiState;
+  private readonly gestureSystem: ImGuiGestureSystem;;
 
   constructor(domId: string, canvasSize: Vec2<number>, debug: boolean = true) {
     this.config = {
       canvasSize,
+      domId,
+      debug,
+    };
+
+    this.state = {
       elements: [],
       elementStack: [],
-      domId,
-      debug
     };
 
     this.rootHTMLElement = this.constructRootDOMElement(domId);
     this.rootImElement = this.constructRootImElement();
+
+    this.gestureSystem = new ImGuiGestureSystem();
   }
 
   // called to start compiling elements
@@ -25,32 +32,69 @@ export default class ImGui {
     // clear old drawn data
     this.freshPaint();
 
-    this.config.elements = [this.rootImElement];
-    this.config.elementStack = [this.rootImElement.elementIdx];
+    this.state.elements = [this.rootImElement];
+    this.state.elementStack = [this.rootImElement.elementIdx];
   }
 
   // called after begin to end compiling elements and start the draw process
   public end() {
-    this.assert(this.config.elementStack.length === 1, "A container was not closed.");
+    this.assert(this.state.elementStack.length === 1, "A container was not closed.");
 
     for (const childIdx of this.rootImElement.children) {
-      const child = this.config.elements[childIdx];
+      const child = this.state.elements[childIdx];
       if (!child.hasPerformedLayout) child.layout(this.rootImElement, child);
       this.draw(this.rootImElement, child);
     }
 
+    this.checkForGestures();
+
     this.log('End is finished: Children of root: ', this.rootHTMLElement.childElementCount);
-    this.log('# elements: ', this.config.elements.length);
-    this.log('# elements in stack: ', this.config.elementStack.length);
+    this.log('# elements: ', this.state.elements.length);
+    this.log('# elements in stack: ', this.state.elementStack.length);
+  }
+
+  private checkForGestures() {
+    this.log('checking for gestures');
+
+    const actionableEvent = this.gestureSystem.endOfFrame();
+    if (!actionableEvent) return;
+
+    this.log('Found an actionable gesture');
+
+    const containingElements = this.findAllContainingElements(actionableEvent.x, actionableEvent.y, this.rootImElement);
+
+    if (actionableEvent.eventType === 'click') {
+      for (let idx = containingElements.length - 1; idx >= 0; idx--) {
+        const element = containingElements[idx];
+        if (element.onClick) {
+          element.onClick(element);
+          return;
+        }
+      }
+    }
+  }
+
+  private findAllContainingElements(x: number, y: number, root: ImElement, containing: ImElement[] = []): ImElement[] {
+    if (!root.children) return containing;
+
+    for (const childIdx of root.children) {
+      const child = this.state.elements[childIdx];
+      if (child.absRect.containsPoint(x, y)) {
+        containing.push(child);
+        this.findAllContainingElements(x, y, child, containing);
+      }
+    }
+
+    return containing;
   }
 
   private getCurrentContainerElement(): number {
-    return this.config.elementStack[this.config.elementStack.length - 1];
+    return this.state.elementStack[this.state.elementStack.length - 1];
   }
 
   private popCurrentContainerElement(): number {
-    const currContainerIdx = this.config.elementStack[this.config.elementStack.length - 1];
-    this.config.elementStack.pop();
+    const currContainerIdx = this.state.elementStack[this.state.elementStack.length - 1];
+    this.state.elementStack.pop();
     return currContainerIdx;
   }
 
@@ -64,7 +108,7 @@ export default class ImGui {
 
     if (element.children) {
       for (const childIdx of element.children) {
-        const child = this.config.elements[childIdx];
+        const child = this.state.elements[childIdx];
         this.draw(element, child);
       }
     }
@@ -85,17 +129,17 @@ export default class ImGui {
   // all elements MUST have a parent. The only exception is the RootElement
   // empty args will default to use the top-most element in the elementStack
   private addElementAndReturnIndex(element: ImElement, parentIdx?: number): number {
-    let elementIdx = this.config.elements.length;
+    let elementIdx = this.state.elements.length;
     element.elementIdx = elementIdx;
-    this.config.elements.push(element);
+    this.state.elements.push(element);
 
     if (!parentIdx) {
-      parentIdx = this.config.elementStack[this.config.elementStack.length - 1];
+      parentIdx = this.state.elementStack[this.state.elementStack.length - 1];
     }
 
 
     // add the element to its appropriate parent
-    const parentElement: ImElement = this.config.elements[parentIdx];
+    const parentElement: ImElement = this.state.elements[parentIdx];
     parentElement.children.push(elementIdx);
 
     return elementIdx;
@@ -112,7 +156,7 @@ export default class ImGui {
   public beginStack(params: ImStackParams) {
     const stack = new ImStack(params);
     const elementIdx = this.addElementAndReturnIndex(stack);
-    this.config.elementStack.push(elementIdx);
+    this.state.elementStack.push(elementIdx);
     stack.layout = this.stackLayout;
   }
 
@@ -134,9 +178,11 @@ export default class ImGui {
 
     if (self.orientation === 'vertical') {
       for (const childIdx of self.children) {
-        const child = this.config.elements[childIdx];
+        const child = this.state.elements[childIdx];
 
         child.layout(self, child);
+
+        child.absRect.moveVertically(heightSum);
 
         heightSum += child.calculatedHeight;
         widthSum += child.calculatedWidth;
@@ -146,7 +192,7 @@ export default class ImGui {
       self.calculatedWidth = widthSum;
     } else {
       for (const childIdx of self.children) {
-        const child = this.config.elements[childIdx];
+        const child = this.state.elements[childIdx];
 
         child.layout(self, child);
 
@@ -173,6 +219,7 @@ export default class ImGui {
 
     const rootHTMLElement = attemptedQuery as HTMLDivElement;
     rootHTMLElement.setAttribute('style', `height: ${this.config.canvasSize.y}px; width: ${this.config.canvasSize.x}px;`);
+
     return rootHTMLElement;
   }
 
@@ -194,12 +241,18 @@ export default class ImGui {
 
   private convertImElementToHTMLDiv(element: ImElement): HTMLDivElement {
     const htmlDivElement = document.createElement('div');
-    let styleStr = `height: ${element.height.val}${element.height.unit}; width: ${element.width.val}${element.width.unit};position: relative;`;
-    if (element.backgroundColor) {
-      styleStr += `background: ${element.backgroundColor}`;
-    }
+
+    const styleStr = constructSyleString(element);
+
     htmlDivElement.setAttribute('style', styleStr);
     htmlDivElement.setAttribute('id', element.id);
+
+    // if (element.onClick) {
+    //   htmlDivElement.addEventListener('click', function (event) {
+    //     element.onClick(element);
+    //   });
+    // }
+
     element.htmlDivElement = htmlDivElement;
     return htmlDivElement;
   }
