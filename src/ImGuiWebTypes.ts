@@ -1,13 +1,8 @@
+import { thisTypeAnnotation } from "@babel/types";
+
 export interface Vec2<t> {
     x: t;
     y: t;
-};
-
-export interface Rect {
-    x1: number;
-    x2: number;
-    y1: number;
-    y2: number;
 };
 
 export type SizeUnit = 'px' | 'em' | 'rem' | '%';
@@ -37,12 +32,40 @@ export interface ImElementParams {
     width: SizeType;
     backgroundColor?: string;
 }
+
+
+export class Rect {
+    x1: number;
+    x2: number;
+    y1: number;
+    y2: number;
+
+    constructor(x1: number, x2: number, y1: number, y2: number) {
+        this.x1 = x1;
+        this.x2 = x2;
+        this.y1 = y1;
+        this.y2 = y2;
+    }
+
+    public clipAgainst(rect: Rect): void { }
+
+    public moveHorizontally(by: number) {
+        this.x1 += by;
+        this.x2 += by;
+    }
+
+    public moveVertically(by: number) {
+        this.y1 += by;
+        this.y2 += by;
+    }
+};
+
 // base class for all elements.
 export class ImElement {
     id: string;
     // index of the element within the elements array
     elementIdx: number = -1;
-    absRect: Rect = { x1: -1, x2: -1, y1: -1, y2: -1 };
+    absRect: Rect = new Rect(-1, -1, -1, -1);
 
     height: SizeType = { val: 0, unit: "px" };
     calculatedHeight?: number;

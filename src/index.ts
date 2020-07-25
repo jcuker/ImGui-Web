@@ -37,10 +37,10 @@ window.onload = () => {
         if (playing) {
             ImGuiInstance.begin();
             ImGuiInstance.beginStack({
-                id: 'vStack',
+                id: 'hStack',
                 height: constructSizeType(50, 'px'),
                 width: constructSizeType(50, 'px'),
-                orientation: 'vertical',
+                orientation: 'horizontal',
                 backgroundColor: '#eee'
             });
             ImGuiInstance.rect({

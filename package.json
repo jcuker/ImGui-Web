@@ -21,18 +21,16 @@
     "ts-loader": "^8.0.1",
     "typescript": "^3.9.7",
     "webpack": "^4.43.0",
-    "webpack-cli": "^3.3.12"
+    "webpack-cli": "^3.3.12",
+    "webpack-dev-server": "^3.11.0"
   },
   "scripts": {
     "type-check": "tsc --noEmit",
     "type-check:watch": "npm run type-check -- --watch",
     "build": "tsc",
-    "build:types": "tsc --emitDeclarationOnly",
-    "build:js": "babel src --out-dir lib --extensions \".ts,.tsx\" --source-maps inline",
-    "bundle": "rollup -c",
-    "start": "node dist/index.js",
     "prestart": "npm run build",
-    "b": "webpack"
+    "b": "webpack",
+    "start": "webpack-dev-server --mode development"
   },
   "dependencies": {}
 }

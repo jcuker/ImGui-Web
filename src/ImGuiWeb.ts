@@ -1,4 +1,4 @@
-import { ImConfig, Vec2, ImElement, ImRectElementParams, ImStack, ImStackParams } from "./ImGuiWebTypes";
+import { ImConfig, Vec2, ImElement, ImRectElementParams, ImStack, ImStackParams, Rect } from "./ImGuiWebTypes";
 import { constructSizeType } from "./ImGuiHelpers";
 import { simpleLayout } from "./ImGuiWebLayoutFunctions";
 
@@ -130,10 +130,12 @@ export default class ImGui {
   private stackLayout = (parent: ImElement, self: ImStack): void => {
     let heightSum = 0;
     let widthSum = 0;
+    let childSpacing = 0;
 
     if (self.orientation === 'vertical') {
       for (const childIdx of self.children) {
         const child = this.config.elements[childIdx];
+
         child.layout(self, child);
 
         heightSum += child.calculatedHeight;
@@ -145,7 +147,10 @@ export default class ImGui {
     } else {
       for (const childIdx of self.children) {
         const child = this.config.elements[childIdx];
+
         child.layout(self, child);
+
+        child.absRect.moveHorizontally(widthSum);
 
         heightSum += child.calculatedHeight;
         widthSum += child.calculatedWidth;
@@ -155,12 +160,7 @@ export default class ImGui {
       self.calculatedWidth = widthSum;
     }
 
-    self.absRect = {
-      x1: parent.absRect.x1,
-      x2: parent.absRect.x1 + self.calculatedWidth,
-      y1: parent.absRect.y1,
-      y2: parent.absRect.y1 + self.calculatedHeight,
-    };
+    self.absRect = new Rect(parent.absRect.x1, parent.absRect.x1 + self.calculatedWidth, parent.absRect.y1, parent.absRect.y1 + self.calculatedHeight);
 
     self.hasPerformedLayout = true;
   }
@@ -183,12 +183,7 @@ export default class ImGui {
       width: constructSizeType(this.config.canvasSize.x, 'px'),
     });
 
-    rootElement.absRect = {
-      x1: 0,
-      x2: this.config.canvasSize.x,
-      y1: 0,
-      y2: this.config.canvasSize.y
-    };
+    rootElement.absRect = new Rect(0, this.config.canvasSize.x, 0, this.config.canvasSize.y);
     rootElement.hasPerformedLayout = true;
     rootElement.children = [];
     rootElement.elementIdx = 0;
@@ -199,7 +194,7 @@ export default class ImGui {
 
   private convertImElementToHTMLDiv(element: ImElement): HTMLDivElement {
     const htmlDivElement = document.createElement('div');
-    let styleStr = `height: ${element.height.val}${element.height.unit}; width: ${element.width.val}${element.width.unit};`;
+    let styleStr = `height: ${element.height.val}${element.height.unit}; width: ${element.width.val}${element.width.unit};position: relative;`;
     if (element.backgroundColor) {
       styleStr += `background: ${element.backgroundColor}`;
     }
