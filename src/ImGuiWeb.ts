@@ -1,13 +1,21 @@
 import { ImConfig, Vec2, ImElement, ImRectElementParams, ImStack, ImStackParams, Rect, ImGuiState, ImGuiGestureSystem } from "./ImGuiWebTypes";
-import { constructSizeType, constructSyleString } from "./ImGuiHelpers";
+import { constructSizeType, constructSyleString, childrenTheSame } from "./ImGuiHelpers";
 import { simpleLayout } from "./ImGuiWebLayoutFunctions";
+
+/**
+ * to avoid the click issue, try to keep track of the diff of the previous and current frame and only add new things and remove things that DO NOT appear this render
+ */
+
 
 export default class ImGui {
   private readonly config: ImConfig;
   private readonly rootHTMLElement: HTMLDivElement;
   private readonly rootImElement: ImElement;
   private readonly state: ImGuiState;
-  private readonly gestureSystem: ImGuiGestureSystem;;
+  private readonly gestureSystem: ImGuiGestureSystem;
+
+  // Cache things from previous frame in this object
+  private prevFrameState: Partial<ImGuiState>;
 
   constructor(domId: string, canvasSize: Vec2<number>, debug: boolean = true) {
     this.config = {
@@ -19,6 +27,7 @@ export default class ImGui {
     this.state = {
       elements: [],
       elementStack: [],
+      idSet: [],
     };
 
     this.rootHTMLElement = this.constructRootDOMElement(domId);
@@ -34,6 +43,7 @@ export default class ImGui {
 
     this.state.elements = [this.rootImElement];
     this.state.elementStack = [this.rootImElement.elementIdx];
+    this.state.idSet = [];
   }
 
   // called after begin to end compiling elements and start the draw process
@@ -42,20 +52,19 @@ export default class ImGui {
 
     for (const childIdx of this.rootImElement.children) {
       const child = this.state.elements[childIdx];
-      if (!child.hasPerformedLayout) child.layout(this.rootImElement, child);
+      // assumption - everything has to be in a container and that contianer will layout chilren upon end()
+      // if (!child.hasPerformedLayout) child.layout(this.rootImElement, child);
+
       this.draw(this.rootImElement, child);
     }
 
     this.checkForGestures();
 
-    this.log('End is finished: Children of root: ', this.rootHTMLElement.childElementCount);
-    this.log('# elements: ', this.state.elements.length);
-    this.log('# elements in stack: ', this.state.elementStack.length);
+    // cache this frame state
+    this.prevFrameState = { ...this.state };
   }
 
   private checkForGestures() {
-    this.log('checking for gestures');
-
     const actionableEvent = this.gestureSystem.endOfFrame();
     if (!actionableEvent) return;
 
@@ -88,8 +97,12 @@ export default class ImGui {
     return containing;
   }
 
-  private getCurrentContainerElement(): number {
+  private getCurrentContainerElementIndex(): number {
     return this.state.elementStack[this.state.elementStack.length - 1];
+  }
+
+  private getCurrentContainerElement(): ImElement {
+    return this.state.elements[this.getCurrentContainerElementIndex()];
   }
 
   private popCurrentContainerElement(): number {
@@ -99,29 +112,70 @@ export default class ImGui {
   }
 
   // Draws an element and recursively draws its children. MUST be called AFTER Layout
-  private draw(parent: ImElement, element: ImElement) {
+  private draw(parent: ImElement, element: ImElement, parentWasInvalidated: boolean = false) {
     const elementAsHTMLDiv = element.htmlDivElement
       ? element.htmlDivElement
       : this.convertImElementToHTMLDiv(element);
 
-    this.appendHTMLDivToHTMLElement(parent.htmlDivElement, elementAsHTMLDiv);
+    const elementInLastFrame = this.prevFrameState && this.prevFrameState.idSet.includes(element.id);
+    const elementInThisFrame = this.state.idSet.includes(element.id);
+    const elementNeedsRedraw = parentWasInvalidated || this.test(element);
+
+    if (elementInLastFrame && !elementInThisFrame) {
+      // remove element from dom
+      this.removeHTMLDivFromParent(parent.htmlDivElement, elementAsHTMLDiv);
+    } else if (!elementInLastFrame && elementInThisFrame) {
+      // add element to dom
+      this.appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
+    } else if (elementNeedsRedraw) {
+      this.removeHTMLDivFromParent(parent.htmlDivElement, elementAsHTMLDiv);
+      this.appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
+    }
+
 
     if (element.children) {
       for (const childIdx of element.children) {
         const child = this.state.elements[childIdx];
-        this.draw(element, child);
+        this.draw(element, child, elementNeedsRedraw);
       }
     }
   }
 
-  private freshPaint() {
-    this.log('Cleaning the root element. Children#: ', this.rootHTMLElement.childElementCount);
-    while (this.rootHTMLElement.firstChild) {
-      // if there is a first there is a last
-      this.rootHTMLElement.removeChild(this.rootHTMLElement.lastChild as ChildNode);
-    }
-    this.log('While first, remove last. Children#: ', this.rootHTMLElement.childElementCount);
+  private test(element: ImElement): boolean {
+    let redraw = true;
 
+    // check to see if the children are the same
+    const getChildrenFromChildrenIdx = (idxs: number[], elements: ImElement[]) => {
+      const children: ImElement[] = [];
+
+      for (const idx of idxs) {
+        children.push(elements[idx]);
+      }
+
+      return children;
+    }
+
+    if (element.id !== 'stack') return;
+
+    const previousElement = this.prevFrameState && this.prevFrameState.elements.find((e: ImElement) => e.id === element.id);
+    const previousChildren = previousElement && previousElement.children ? getChildrenFromChildrenIdx(previousElement.children, this.prevFrameState.elements) : [];
+    const currChildren = element.children ? getChildrenFromChildrenIdx(element.children, this.state.elements) : [];
+
+    // console.log('Prev Children: ', previousChildren);
+    // console.log('Curr children: ', currChildren);
+
+    redraw = !childrenTheSame(previousChildren, currChildren);
+
+    // console.log('redraw? ', redraw);
+
+    return redraw;
+  }
+
+  private freshPaint() {
+    // while (this.rootHTMLElement.firstChild) {
+    //   // if there is a first there is a last
+    //   this.rootHTMLElement.removeChild(this.rootHTMLElement.lastChild as ChildNode);
+    // }
     // clean root im element
     this.rootImElement.children = [];
   }
@@ -129,14 +183,17 @@ export default class ImGui {
   // all elements MUST have a parent. The only exception is the RootElement
   // empty args will default to use the top-most element in the elementStack
   private addElementAndReturnIndex(element: ImElement, parentIdx?: number): number {
+    this.assert(!this.state.idSet.includes(element.id), "Must use unique ids!");
+
     let elementIdx = this.state.elements.length;
     element.elementIdx = elementIdx;
+
     this.state.elements.push(element);
+    this.state.idSet.push(element.id);
 
     if (!parentIdx) {
       parentIdx = this.state.elementStack[this.state.elementStack.length - 1];
     }
-
 
     // add the element to its appropriate parent
     const parentElement: ImElement = this.state.elements[parentIdx];
@@ -161,7 +218,13 @@ export default class ImGui {
   }
 
   public endStack() {
-    this.popCurrentContainerElement();
+    const stackIdx = this.popCurrentContainerElement();
+
+    // Todo - make a function to return and cast
+    const stackElement: ImStack = this.state.elements[stackIdx] as ImStack;
+    const parentElement: ImElement = this.getCurrentContainerElement();
+
+    stackElement.layout(parentElement, stackElement);
   }
 
   /**
@@ -246,6 +309,7 @@ export default class ImGui {
 
     htmlDivElement.setAttribute('style', styleStr);
     htmlDivElement.setAttribute('id', element.id);
+    htmlDivElement.addEventListener('click', () => console.log('clicked: ', element.id));
 
     // if (element.onClick) {
     //   htmlDivElement.addEventListener('click', function (event) {
@@ -257,8 +321,16 @@ export default class ImGui {
     return htmlDivElement;
   }
 
-  private appendHTMLDivToHTMLElement(parent: HTMLElement, div: HTMLDivElement): void {
-    parent.appendChild(div);
+  private appendHTMLDivToParent(parent: HTMLDivElement, div: HTMLDivElement): void {
+    if (!parent.contains(div)) {
+      parent.appendChild(div);
+    }
+  }
+
+  private removeHTMLDivFromParent(parent: HTMLDivElement, div: HTMLDivElement): void {
+    if (parent.contains(div)) {
+      parent.removeChild(div);
+    }
   }
 
   private log(message?: any, ...optionalParams: any[]): void {

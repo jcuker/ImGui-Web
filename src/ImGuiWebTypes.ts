@@ -25,6 +25,8 @@ export interface ImGuiState {
     elements: ImElement[];
     // Used to keep track of container elements. Anything within a Begin / End pair will be a container with 0 or more children.
     elementStack: number[];
+    // all unique ids
+    idSet: string[];
 }
 
 export type LayoutFunctionPtr = (parent: ImElement, self: ImElement) => void;
@@ -168,8 +170,13 @@ export class ImGuiGestureSystem {
     private state: ImGuiGestureSystemState;
 
     constructor() {
-        ['mousedown', 'mouseup', 'mouseenter', 'mousemove', 'mouseup', 'click'].forEach((eventName: string) => {
-            document.addEventListener(eventName, (event: MouseEvent) => this.processEvent(event));
+        // 'mousedown', 'mouseup', 'mouseenter', 'mousemove', 'mouseup', 
+        ['click'].forEach((eventName: string) => {
+            document.addEventListener(eventName, (event: MouseEvent) => {
+                event.preventDefault();
+                this.processEvent(event);
+                console.log('Click at x: ', event.clientX, ' y: ', event.clientY);
+            }, false);
         });
         this.resetState();
     }
@@ -218,7 +225,6 @@ export class ImGuiGestureSystem {
         if (this.state.eventInProgress === 'click') {
             // if we have two events there has been a 'click'
             if (this.state.currentEvent) {
-
                 actionable = {
                     eventType: 'click',
                     x: this.state.currentEvent.clientX,
@@ -228,7 +234,6 @@ export class ImGuiGestureSystem {
         }
 
         this.resetState();
-
         return actionable;
     }
 }

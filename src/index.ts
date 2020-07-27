@@ -1,18 +1,17 @@
 import ImGuiWeb from './ImGuiWeb';
 import { constructSizeType } from './ImGuiHelpers';
 import { ImElement, ImRectElementParams } from './ImGuiWebTypes';
-import ImGui from './ImGuiWeb';
 
 window.onload = () => {
-    const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 }, false);
+    const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 }, true);
 
     // TODO - clean up these variables
-    let playing = true;
+    let playing = false;
     let fps = 0;
     let framesThisSecond = 0;
     let lastFpsUpdate = 0;
     let lastFrameTimeMs = 0;
-    const maxFPS = 10; // The maximum FPS we want to allow
+    const maxFPS = 60; // The maximum FPS we want to allow
 
     let redFirst = true;
 
@@ -57,7 +56,7 @@ window.onload = () => {
             ImGuiInstance.begin();
 
             ImGuiInstance.beginStack({
-                id: 'hStack',
+                id: 'stack',
                 height: constructSizeType(50, 'px'),
                 width: constructSizeType(50, 'px'),
                 orientation: 'horizontal',
@@ -65,13 +64,16 @@ window.onload = () => {
                 onClick: (element: ImElement) => {
                     console.log('clicked ' + element.id);
                     redFirst = !redFirst;
+                    console.log('setting redFirst to :', redFirst);
                 }
             });
 
             if (redFirst) {
+                console.log('red first!');
                 ImGuiInstance.rect(redRectParams);
                 ImGuiInstance.rect(blueRectParams);
             } else {
+                console.log('blue first')
                 ImGuiInstance.rect(blueRectParams);
                 ImGuiInstance.rect(redRectParams);
             }
