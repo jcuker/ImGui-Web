@@ -2,11 +2,6 @@ import { ImConfig, Vec2, ImElement, ImRectElementParams, ImStack, ImStackParams,
 import { constructSizeType, constructSyleString, childrenTheSame } from "./ImGuiHelpers";
 import { simpleLayout } from "./ImGuiWebLayoutFunctions";
 
-/**
- * to avoid the click issue, try to keep track of the diff of the previous and current frame and only add new things and remove things that DO NOT appear this render
- */
-
-
 export default class ImGui {
   private readonly config: ImConfig;
   private readonly rootHTMLElement: HTMLDivElement;
@@ -14,7 +9,7 @@ export default class ImGui {
   private readonly state: ImGuiState;
   private readonly gestureSystem: ImGuiGestureSystem;
 
-  // Cache things from previous frame in this object
+  // Cache things from previous frame in this object - ideally would want to NOT have this
   private prevFrameState: Partial<ImGuiState>;
 
   constructor(domId: string, canvasSize: Vec2<number>, debug: boolean = true) {
@@ -50,12 +45,24 @@ export default class ImGui {
   public end() {
     this.assert(this.state.elementStack.length === 1, "A container was not closed.");
 
+    let needsRedraw: boolean = this.prevFrameState ? false : true;
+
     for (const childIdx of this.rootImElement.children) {
       const child = this.state.elements[childIdx];
-      // assumption - everything has to be in a container and that contianer will layout chilren upon end()
-      // if (!child.hasPerformedLayout) child.layout(this.rootImElement, child);
 
-      this.draw(this.rootImElement, child);
+      if (this.test(child)) {
+        needsRedraw = true;
+        break;
+      }
+    }
+
+    if (needsRedraw) {
+      this.rootHTMLElement.innerHTML = '';
+
+      for (const childIdx of this.rootImElement.children) {
+        const child = this.state.elements[childIdx];
+        this.draw(this.rootImElement, child);
+      }
     }
 
     this.checkForGestures();
@@ -111,38 +118,41 @@ export default class ImGui {
     return currContainerIdx;
   }
 
+  private invalidateElementAndChildren(element: ImElement): void {
+
+  }
+
   // Draws an element and recursively draws its children. MUST be called AFTER Layout
-  private draw(parent: ImElement, element: ImElement, parentWasInvalidated: boolean = false) {
+  private draw(parent: ImElement, element: ImElement): void {
     const elementAsHTMLDiv = element.htmlDivElement
       ? element.htmlDivElement
       : this.convertImElementToHTMLDiv(element);
 
-    const elementInLastFrame = this.prevFrameState && this.prevFrameState.idSet.includes(element.id);
-    const elementInThisFrame = this.state.idSet.includes(element.id);
-    const elementNeedsRedraw = parentWasInvalidated || this.test(element);
+    this.appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
 
-    if (elementInLastFrame && !elementInThisFrame) {
-      // remove element from dom
-      this.removeHTMLDivFromParent(parent.htmlDivElement, elementAsHTMLDiv);
-    } else if (!elementInLastFrame && elementInThisFrame) {
-      // add element to dom
-      this.appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
-    } else if (elementNeedsRedraw) {
-      this.removeHTMLDivFromParent(parent.htmlDivElement, elementAsHTMLDiv);
-      this.appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
-    }
+    // const elementInLastFrame = this.prevFrameState && this.prevFrameState.idSet.includes(element.id);
+    // const elementInThisFrame = this.state.idSet.includes(element.id);
 
+    // // if (elementNeedsRedraw) debugger;
+
+    // if (elementInLastFrame && !elementInThisFrame) {
+    //   // remove element from dom
+    //   this.removeHTMLDivFromParent(parent.htmlDivElement, elementAsHTMLDiv);
+    // } else if (!elementInLastFrame && elementInThisFrame) {
+    //   // add element to dom
+    //   this.appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
+    // }
 
     if (element.children) {
       for (const childIdx of element.children) {
         const child = this.state.elements[childIdx];
-        this.draw(element, child, elementNeedsRedraw);
+        this.draw(element, child);
       }
     }
   }
 
   private test(element: ImElement): boolean {
-    let redraw = true;
+    if (!element.children || element.children.length === 0) return false;
 
     // check to see if the children are the same
     const getChildrenFromChildrenIdx = (idxs: number[], elements: ImElement[]) => {
@@ -155,8 +165,6 @@ export default class ImGui {
       return children;
     }
 
-    if (element.id !== 'stack') return;
-
     const previousElement = this.prevFrameState && this.prevFrameState.elements.find((e: ImElement) => e.id === element.id);
     const previousChildren = previousElement && previousElement.children ? getChildrenFromChildrenIdx(previousElement.children, this.prevFrameState.elements) : [];
     const currChildren = element.children ? getChildrenFromChildrenIdx(element.children, this.state.elements) : [];
@@ -164,11 +172,13 @@ export default class ImGui {
     // console.log('Prev Children: ', previousChildren);
     // console.log('Curr children: ', currChildren);
 
-    redraw = !childrenTheSame(previousChildren, currChildren);
+    if (!childrenTheSame(previousChildren, currChildren)) return true;
 
-    // console.log('redraw? ', redraw);
+    for (const child of currChildren) {
+      if (this.test(child)) return true;
+    }
 
-    return redraw;
+    return false;
   }
 
   private freshPaint() {
@@ -248,7 +258,7 @@ export default class ImGui {
         child.absRect.moveVertically(heightSum);
 
         heightSum += child.calculatedHeight;
-        widthSum += child.calculatedWidth;
+        widthSum = Math.max(widthSum, child.calculatedWidth);
       }
 
       self.calculatedHeight = heightSum;
@@ -261,7 +271,7 @@ export default class ImGui {
 
         child.absRect.moveHorizontally(widthSum);
 
-        heightSum += child.calculatedHeight;
+        heightSum = Math.max(heightSum, child.calculatedHeight);
         widthSum += child.calculatedWidth;
       }
 
@@ -281,7 +291,8 @@ export default class ImGui {
     }
 
     const rootHTMLElement = attemptedQuery as HTMLDivElement;
-    rootHTMLElement.setAttribute('style', `height: ${this.config.canvasSize.y}px; width: ${this.config.canvasSize.x}px;`);
+    const style = rootHTMLElement.getAttribute('style');
+    rootHTMLElement.setAttribute('style', style + `height: ${this.config.canvasSize.y}px; width: ${this.config.canvasSize.x}px;`);
 
     return rootHTMLElement;
   }
@@ -311,13 +322,8 @@ export default class ImGui {
     htmlDivElement.setAttribute('id', element.id);
     htmlDivElement.addEventListener('click', () => console.log('clicked: ', element.id));
 
-    // if (element.onClick) {
-    //   htmlDivElement.addEventListener('click', function (event) {
-    //     element.onClick(element);
-    //   });
-    // }
-
     element.htmlDivElement = htmlDivElement;
+
     return htmlDivElement;
   }
 
@@ -330,6 +336,13 @@ export default class ImGui {
   private removeHTMLDivFromParent(parent: HTMLDivElement, div: HTMLDivElement): void {
     if (parent.contains(div)) {
       parent.removeChild(div);
+    } else {
+      // check to see if ID matches
+      for (let idx = 0; idx < parent.children.length; idx++) {
+        const child = parent.children[idx];
+        if (child.id === div.id)
+          child.remove();
+      }
     }
   }
 

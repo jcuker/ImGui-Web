@@ -6,3 +6,7 @@ declare module "*.svg" {
 declare module "parse-unit" {
     const parseUnit: (str: string) => any;
 }
+
+declare module "stats.js" {
+
+}

@@ -1,9 +1,18 @@
 import ImGuiWeb from './ImGuiWeb';
 import { constructSizeType } from './ImGuiHelpers';
 import { ImElement, ImRectElementParams } from './ImGuiWebTypes';
+import * as Stats from 'stats.js';
 
 window.onload = () => {
     const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 }, true);
+    const fpsDisplay = document.getElementById('fpsDisplay');
+
+    //@ts-ignore
+    var stats = new Stats();
+    stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+    const statsDom: HTMLCanvasElement = stats.dom;
+    statsDom.style.position = null;
+    fpsDisplay.appendChild(statsDom);
 
     // TODO - clean up these variables
     let playing = false;
@@ -11,23 +20,23 @@ window.onload = () => {
     let framesThisSecond = 0;
     let lastFpsUpdate = 0;
     let lastFrameTimeMs = 0;
-    const maxFPS = 60; // The maximum FPS we want to allow
+    const maxFPS = 80; // The maximum FPS we want to allow
 
     let redFirst = true;
 
 
     const playbackControl = document.getElementById('playbackControl');
-    const fpsDisplay = document.getElementById('fpsDisplay');
     playbackControl.onclick = () => {
         playing = !playing;
     }
 
     function mainLoop(timestamp: any) {
-        // Throttle the frame rate.    
-        if (timestamp < lastFrameTimeMs + (1000 / maxFPS)) {
-            requestAnimationFrame(mainLoop);
-            return;
-        }
+        // // Throttle the frame rate.    
+        // if (timestamp < lastFrameTimeMs + (1000 / maxFPS)) {
+        //     requestAnimationFrame(mainLoop);
+        //     return;
+        // }
+        stats.begin();
         lastFrameTimeMs = timestamp;
 
         if (timestamp > lastFpsUpdate + 1000) {
@@ -56,8 +65,15 @@ window.onload = () => {
             ImGuiInstance.begin();
 
             ImGuiInstance.beginStack({
-                id: 'stack',
+                id: 'hStack',
                 height: constructSizeType(50, 'px'),
+                width: constructSizeType(50, 'px'),
+                orientation: 'vertical'
+            });
+
+            ImGuiInstance.beginStack({
+                id: 'nested-hStack',
+                height: constructSizeType(25, 'px'),
                 width: constructSizeType(50, 'px'),
                 orientation: 'horizontal',
                 backgroundColor: '#eee',
@@ -79,8 +95,18 @@ window.onload = () => {
             }
 
             ImGuiInstance.endStack();
+
+            ImGuiInstance.rect({
+                height: constructSizeType(25, 'px'),
+                width: constructSizeType(25, 'px'),
+                backgroundColor: 'green',
+                id: 'green'
+            });
+
+            ImGuiInstance.endStack();
             ImGuiInstance.end();
-            fpsDisplay.textContent = Math.round(fps) + ' FPS'; // display the FPS
+            stats.end();
+            // fpsDisplay.textContent = Math.round(fps) + ' FPS'; // display the FPS
         }
 
         requestAnimationFrame(mainLoop);
