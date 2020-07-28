@@ -8,5 +8,4 @@ declare module "parse-unit" {
 }
 
 declare module "stats.js" {
-
 }

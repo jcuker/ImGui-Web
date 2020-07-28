@@ -1,22 +1,39 @@
-import { ImConfig, Vec2, ImElement, ImRectElementParams, ImStack, ImStackParams, Rect, ImGuiState, ImGuiGestureSystem } from "./ImGuiWebTypes";
-import { constructSizeType, constructSyleString, childrenTheSame } from "./ImGuiHelpers";
-import { simpleLayout } from "./ImGuiWebLayoutFunctions";
 
-export default class ImGui {
+/**
+ * TODOS:
+ * Relative positioning in x/y
+ * Child element spacing in containers
+ * many others ...
+ */
+
+import { ImGuiGestureSystem } from "./ImGestureSystem";
+import { convertImElementToHTMLDiv, appendHTMLDivToParent, childrenTheSame, constructSizeType } from "./Utils/ImGuiHelpers";
+import { ImRectElementParams } from "./Elements/ImRectElement";
+import { simpleLayout } from "./Utils/ImGuiWebLayoutFunctions";
+import { ImConfig, ImGuiState, Vec2, Rect } from "./ImGuiWebTypes";
+import { ImContainer, ImElement, ImStackParams, ImStackElement } from "./Elements";
+
+/**
+ * A minimal Immediate Mode Graphical User Interface implementation.
+ * 
+ * Follows an adapted Measure -> Layout -> Draw cycle. 
+ * Measure & Layout have been combined into one step.
+ * Draw is not really 'drawing' like it would in graphical programming, but will emulate the same behaviour.
+ */
+export default class ImGuiWeb {
   private readonly config: ImConfig;
   private readonly rootHTMLElement: HTMLDivElement;
-  private readonly rootImElement: ImElement;
+  private readonly rootImElement: ImContainer;
   private readonly state: ImGuiState;
   private readonly gestureSystem: ImGuiGestureSystem;
 
   // Cache things from previous frame in this object - ideally would want to NOT have this
   private prevFrameState: Partial<ImGuiState>;
 
-  constructor(domId: string, canvasSize: Vec2<number>, debug: boolean = true) {
+  constructor(domId: string, canvasSize: Vec2<number>) {
     this.config = {
       canvasSize,
       domId,
-      debug,
     };
 
     this.state = {
@@ -31,26 +48,28 @@ export default class ImGui {
     this.gestureSystem = new ImGuiGestureSystem();
   }
 
-  // called to start compiling elements
+  /**
+   * Called once at the beginning of each frame. This clears last frame's information
+   */
   public begin() {
-    // clear old drawn data
-    this.freshPaint();
-
+    this.rootImElement.children = [];
     this.state.elements = [this.rootImElement];
     this.state.elementStack = [this.rootImElement.elementIdx];
     this.state.idSet = [];
   }
 
-  // called after begin to end compiling elements and start the draw process
+  /**
+   * Called once at the end of each frame. This starts the 'draw' process.
+   */
   public end() {
-    this.assert(this.state.elementStack.length === 1, "A container was not closed.");
+    if (this.state.elementStack.length !== 1) console.error("A container was not closed.");
 
     let needsRedraw: boolean = this.prevFrameState ? false : true;
 
     for (const childIdx of this.rootImElement.children) {
       const child = this.state.elements[childIdx];
 
-      if (this.test(child)) {
+      if (child instanceof ImContainer && this.checkSubTreeForRedraw(child)) {
         needsRedraw = true;
         break;
       }
@@ -75,8 +94,6 @@ export default class ImGui {
     const actionableEvent = this.gestureSystem.endOfFrame();
     if (!actionableEvent) return;
 
-    this.log('Found an actionable gesture');
-
     const containingElements = this.findAllContainingElements(actionableEvent.x, actionableEvent.y, this.rootImElement);
 
     if (actionableEvent.eventType === 'click') {
@@ -88,20 +105,6 @@ export default class ImGui {
         }
       }
     }
-  }
-
-  private findAllContainingElements(x: number, y: number, root: ImElement, containing: ImElement[] = []): ImElement[] {
-    if (!root.children) return containing;
-
-    for (const childIdx of root.children) {
-      const child = this.state.elements[childIdx];
-      if (child.absRect.containsPoint(x, y)) {
-        containing.push(child);
-        this.findAllContainingElements(x, y, child, containing);
-      }
-    }
-
-    return containing;
   }
 
   private getCurrentContainerElementIndex(): number {
@@ -118,32 +121,15 @@ export default class ImGui {
     return currContainerIdx;
   }
 
-  private invalidateElementAndChildren(element: ImElement): void {
-
-  }
-
   // Draws an element and recursively draws its children. MUST be called AFTER Layout
   private draw(parent: ImElement, element: ImElement): void {
     const elementAsHTMLDiv = element.htmlDivElement
       ? element.htmlDivElement
-      : this.convertImElementToHTMLDiv(element);
+      : convertImElementToHTMLDiv(element);
 
-    this.appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
+    appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
 
-    // const elementInLastFrame = this.prevFrameState && this.prevFrameState.idSet.includes(element.id);
-    // const elementInThisFrame = this.state.idSet.includes(element.id);
-
-    // // if (elementNeedsRedraw) debugger;
-
-    // if (elementInLastFrame && !elementInThisFrame) {
-    //   // remove element from dom
-    //   this.removeHTMLDivFromParent(parent.htmlDivElement, elementAsHTMLDiv);
-    // } else if (!elementInLastFrame && elementInThisFrame) {
-    //   // add element to dom
-    //   this.appendHTMLDivToParent(parent.htmlDivElement, elementAsHTMLDiv);
-    // }
-
-    if (element.children) {
+    if (element instanceof ImContainer) {
       for (const childIdx of element.children) {
         const child = this.state.elements[childIdx];
         this.draw(element, child);
@@ -151,7 +137,15 @@ export default class ImGui {
     }
   }
 
-  private test(element: ImElement): boolean {
+  /**
+   * Checks an ImContainer element for validity by looking at its children across the previous frame and the current frame.
+   * If there is ANY change the entire subtree needs to be redrawn.
+   * 
+   * TODO - this function can, and needs, to be optimized.
+   * 
+   * @param element element to check for validity. All of this element's children will be checked as well
+   */
+  private checkSubTreeForRedraw(element: ImContainer): boolean {
     if (!element.children || element.children.length === 0) return false;
 
     // check to see if the children are the same
@@ -166,34 +160,22 @@ export default class ImGui {
     }
 
     const previousElement = this.prevFrameState && this.prevFrameState.elements.find((e: ImElement) => e.id === element.id);
-    const previousChildren = previousElement && previousElement.children ? getChildrenFromChildrenIdx(previousElement.children, this.prevFrameState.elements) : [];
+    const previousChildren = previousElement && previousElement instanceof ImContainer ? getChildrenFromChildrenIdx(previousElement.children, this.prevFrameState.elements) : [];
     const currChildren = element.children ? getChildrenFromChildrenIdx(element.children, this.state.elements) : [];
-
-    // console.log('Prev Children: ', previousChildren);
-    // console.log('Curr children: ', currChildren);
 
     if (!childrenTheSame(previousChildren, currChildren)) return true;
 
     for (const child of currChildren) {
-      if (this.test(child)) return true;
+      if (child instanceof ImContainer && this.checkSubTreeForRedraw(child)) return true;
     }
 
     return false;
   }
 
-  private freshPaint() {
-    // while (this.rootHTMLElement.firstChild) {
-    //   // if there is a first there is a last
-    //   this.rootHTMLElement.removeChild(this.rootHTMLElement.lastChild as ChildNode);
-    // }
-    // clean root im element
-    this.rootImElement.children = [];
-  }
-
   // all elements MUST have a parent. The only exception is the RootElement
   // empty args will default to use the top-most element in the elementStack
   private addElementAndReturnIndex(element: ImElement, parentIdx?: number): number {
-    this.assert(!this.state.idSet.includes(element.id), "Must use unique ids!");
+    if (this.state.idSet.includes(element.id)) console.error("Must use unique ids!");
 
     let elementIdx = this.state.elements.length;
     element.elementIdx = elementIdx;
@@ -207,6 +189,12 @@ export default class ImGui {
 
     // add the element to its appropriate parent
     const parentElement: ImElement = this.state.elements[parentIdx];
+
+    if (!(parentElement instanceof ImContainer)) {
+      console.error('parent element was not an instance of ImContainer.');
+      return -1;
+    }
+
     parentElement.children.push(elementIdx);
 
     return elementIdx;
@@ -221,7 +209,7 @@ export default class ImGui {
 
 
   public beginStack(params: ImStackParams) {
-    const stack = new ImStack(params);
+    const stack = new ImStackElement(params);
     const elementIdx = this.addElementAndReturnIndex(stack);
     this.state.elementStack.push(elementIdx);
     stack.layout = this.stackLayout;
@@ -231,7 +219,7 @@ export default class ImGui {
     const stackIdx = this.popCurrentContainerElement();
 
     // Todo - make a function to return and cast
-    const stackElement: ImStack = this.state.elements[stackIdx] as ImStack;
+    const stackElement: ImStackElement = this.state.elements[stackIdx] as ImStackElement;
     const parentElement: ImElement = this.getCurrentContainerElement();
 
     stackElement.layout(parentElement, stackElement);
@@ -244,7 +232,8 @@ export default class ImGui {
  * @param parent reference to parent container
  * @param self reference to self
  */
-  private stackLayout = (parent: ImElement, self: ImStack): void => {
+  private stackLayout = (parent: ImElement, self: ImStackElement): void => {
+    // TODO - spacing children
     let heightSum = 0;
     let widthSum = 0;
     let childSpacing = 0;
@@ -297,8 +286,8 @@ export default class ImGui {
     return rootHTMLElement;
   }
 
-  private constructRootImElement(): ImElement {
-    const rootElement: ImElement = new ImElement({
+  private constructRootImElement(): ImContainer {
+    const rootElement: ImContainer = new ImContainer({
       id: 'ImGuiWeb-Root',
       height: constructSizeType(this.config.canvasSize.x, 'px'),
       width: constructSizeType(this.config.canvasSize.x, 'px'),
@@ -313,57 +302,17 @@ export default class ImGui {
     return rootElement;
   }
 
-  private convertImElementToHTMLDiv(element: ImElement): HTMLDivElement {
-    const htmlDivElement = document.createElement('div');
+  private findAllContainingElements(x: number, y: number, root: ImElement, containing: ImElement[] = []): ImElement[] {
+    if (!(root instanceof ImContainer)) return containing;
 
-    const styleStr = constructSyleString(element);
-
-    htmlDivElement.setAttribute('style', styleStr);
-    htmlDivElement.setAttribute('id', element.id);
-    htmlDivElement.addEventListener('click', () => console.log('clicked: ', element.id));
-
-    element.htmlDivElement = htmlDivElement;
-
-    return htmlDivElement;
-  }
-
-  private appendHTMLDivToParent(parent: HTMLDivElement, div: HTMLDivElement): void {
-    if (!parent.contains(div)) {
-      parent.appendChild(div);
-    }
-  }
-
-  private removeHTMLDivFromParent(parent: HTMLDivElement, div: HTMLDivElement): void {
-    if (parent.contains(div)) {
-      parent.removeChild(div);
-    } else {
-      // check to see if ID matches
-      for (let idx = 0; idx < parent.children.length; idx++) {
-        const child = parent.children[idx];
-        if (child.id === div.id)
-          child.remove();
+    for (const childIdx of root.children) {
+      const child = this.state.elements[childIdx];
+      if (child.absRect.containsPoint(x, y)) {
+        containing.push(child);
+        this.findAllContainingElements(x, y, child, containing);
       }
     }
-  }
 
-  private log(message?: any, ...optionalParams: any[]): void {
-    if (this.config.debug) {
-      console.log(message, ...optionalParams);
-    }
-  }
-
-  private getRandomColor() {
-    var letters = '0123456789ABCDEF';
-    var color = '#';
-    for (var i = 0; i < 6; i++) {
-      color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-  }
-
-  private assert(expression: boolean, msg: string) {
-    if (!expression) {
-      alert(msg);
-    }
+    return containing;
   }
 }

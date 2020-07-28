@@ -1,4 +1,4 @@
-import { SizeType } from "./ImGuiWebTypes"
+import { SizeType } from "../ImGuiWebTypes";
 
 const PIXELS_PER_INCH = 96
 

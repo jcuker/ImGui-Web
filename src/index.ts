@@ -1,51 +1,32 @@
-import ImGuiWeb from './ImGuiWeb';
-import { constructSizeType } from './ImGuiHelpers';
-import { ImElement, ImRectElementParams } from './ImGuiWebTypes';
 import * as Stats from 'stats.js';
+import ImGuiWeb from './ImGui/ImGuiWeb';
+import { ImRectElementParams } from './ImGui/Elements/ImRectElement';
+import { constructSizeType } from './ImGui/Utils/ImGuiHelpers';
+import { ImElement } from './ImGui/Elements/ImElement';
 
 window.onload = () => {
-    const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 }, true);
+    const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 });
     const fpsDisplay = document.getElementById('fpsDisplay');
 
     //@ts-ignore
+    // TODO - wrap stats up more nicely
     var stats = new Stats();
     stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
     const statsDom: HTMLCanvasElement = stats.dom;
     statsDom.style.position = null;
     fpsDisplay.appendChild(statsDom);
 
-    // TODO - clean up these variables
     let playing = false;
-    let fps = 0;
-    let framesThisSecond = 0;
-    let lastFpsUpdate = 0;
-    let lastFrameTimeMs = 0;
-    const maxFPS = 80; // The maximum FPS we want to allow
-
     let redFirst = true;
-
 
     const playbackControl = document.getElementById('playbackControl');
     playbackControl.onclick = () => {
         playing = !playing;
     }
 
-    function mainLoop(timestamp: any) {
-        // // Throttle the frame rate.    
-        // if (timestamp < lastFrameTimeMs + (1000 / maxFPS)) {
-        //     requestAnimationFrame(mainLoop);
-        //     return;
-        // }
+    function mainLoop(timestamp: number) {
+        // TODO - explore framerate throttling
         stats.begin();
-        lastFrameTimeMs = timestamp;
-
-        if (timestamp > lastFpsUpdate + 1000) {
-            fps = 0.25 * framesThisSecond + 0.75 * fps;
-
-            lastFpsUpdate = timestamp;
-            framesThisSecond = 0;
-        }
-        framesThisSecond++;
 
         const redRectParams: ImRectElementParams = {
             height: constructSizeType(25, 'px'),
@@ -59,6 +40,13 @@ window.onload = () => {
             width: constructSizeType(25, 'px'),
             id: 'blue',
             backgroundColor: 'blue'
+        };
+
+        const greenRectParams: ImRectElementParams = {
+            height: constructSizeType(25, 'px'),
+            width: constructSizeType(25, 'px'),
+            backgroundColor: 'green',
+            id: 'green'
         };
 
         if (playing) {
@@ -78,35 +66,26 @@ window.onload = () => {
                 orientation: 'horizontal',
                 backgroundColor: '#eee',
                 onClick: (element: ImElement) => {
-                    console.log('clicked ' + element.id);
                     redFirst = !redFirst;
-                    console.log('setting redFirst to :', redFirst);
                 }
             });
 
+            // shows how interactivity can be accomplished
             if (redFirst) {
-                console.log('red first!');
                 ImGuiInstance.rect(redRectParams);
                 ImGuiInstance.rect(blueRectParams);
             } else {
-                console.log('blue first')
                 ImGuiInstance.rect(blueRectParams);
                 ImGuiInstance.rect(redRectParams);
             }
 
             ImGuiInstance.endStack();
 
-            ImGuiInstance.rect({
-                height: constructSizeType(25, 'px'),
-                width: constructSizeType(25, 'px'),
-                backgroundColor: 'green',
-                id: 'green'
-            });
+            ImGuiInstance.rect(greenRectParams);
 
             ImGuiInstance.endStack();
             ImGuiInstance.end();
             stats.end();
-            // fpsDisplay.textContent = Math.round(fps) + ' FPS'; // display the FPS
         }
 
         requestAnimationFrame(mainLoop);

@@ -1,5 +1,6 @@
-import { ImElement, Rect } from "./ImGuiWebTypes";
+import { ImElement } from "../Elements/ImElement";
 import toPx from "./ToPixel";
+import { Rect } from "../ImGuiWebTypes";
 
 export function simpleLayout(parent: ImElement, self: ImElement): void {
     const width = toPx(self.width);
