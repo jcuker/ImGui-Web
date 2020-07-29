@@ -6,6 +6,8 @@
     "target": "es5",
     "allowJs": true,
     "sourceMap": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   }
 }

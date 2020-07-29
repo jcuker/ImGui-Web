@@ -4,24 +4,33 @@ import { ImRectElementParams } from './ImGui/Elements/ImRectElement';
 import { constructSizeType } from './ImGui/Utils/ImGuiHelpers';
 import { ImElement } from './ImGui/Elements/ImElement';
 
-window.onload = () => {
-    const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 });
+// TODO - type stats
+function setUpStats(): any {
     const fpsDisplay = document.getElementById('fpsDisplay');
 
     //@ts-ignore
     // TODO - wrap stats up more nicely
-    var stats = new Stats();
+    const stats = new Stats();
     stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
     const statsDom: HTMLCanvasElement = stats.dom;
     statsDom.style.position = null;
     fpsDisplay.appendChild(statsDom);
+    return stats;
+}
+
+window.onload = () => {
+    const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 });
+
+    const stats = setUpStats();
 
     let playing = false;
     let redFirst = true;
 
     const playbackControl = document.getElementById('playbackControl');
+    playing ? playbackControl.textContent = 'Pause' : playbackControl.textContent = 'Play';
     playbackControl.onclick = () => {
         playing = !playing;
+        playing ? playbackControl.textContent = 'Pause' : playbackControl.textContent = 'Play';
     }
 
     function mainLoop(timestamp: number) {
@@ -94,4 +103,3 @@ window.onload = () => {
     // Start things off
     requestAnimationFrame(mainLoop);
 }
-
