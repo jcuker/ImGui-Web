@@ -8,11 +8,12 @@
  */
 
 import { ImGuiGestureSystem } from "./ImGestureSystem";
-import { convertImElementToHTMLDiv, appendHTMLDivToParent, childrenTheSame, constructSizeType } from "./Utils/ImGuiHelpers";
+import { convertImElementToHTMLDiv, appendHTMLDivToParent, childrenTheSame, constructSizeType, updateHTMLDiv } from "./Utils/ImGuiHelpers";
 import { ImRectElementParams } from "./Elements/ImRectElement";
 import { simpleLayout } from "./Utils/ImGuiWebLayoutFunctions";
 import { ImConfig, ImGuiState, Vec2, Rect } from "./ImGuiWebTypes";
 import { ImContainer, ImElement, ImStackParams, ImStackElement } from "./Elements";
+import toPx from "./Utils/ToPixel";
 
 /**
  * A minimal Immediate Mode Graphical User Interface implementation.
@@ -83,6 +84,11 @@ export default class ImGuiWeb {
         const child = this.state.elements[childIdx];
         this.draw(this.rootImElement, child);
       }
+    } else {
+      for (const childIdx of this.rootImElement.children) {
+        const child = this.state.elements[childIdx];
+        this.update(child);
+      }
     }
 
     this.checkForGestures();
@@ -134,6 +140,30 @@ export default class ImGuiWeb {
       for (const childIdx of element.children) {
         const child = this.state.elements[childIdx];
         this.draw(element, child);
+      }
+    }
+  }
+
+  // updates the element's HTMLElement to reflect this render's changes
+  private update(element: ImElement): void {
+
+    const htmlDivElement: HTMLDivElement = element.htmlDivElement
+      ? element.htmlDivElement
+      : document.getElementById(element.id) as HTMLDivElement;
+
+    if (!htmlDivElement) {
+      console.log(element);
+      return;
+    }
+
+    element.htmlDivElement = htmlDivElement;
+
+    updateHTMLDiv(element);
+
+    if (element instanceof ImContainer) {
+      for (const childIdx of element.children) {
+        const child = this.state.elements[childIdx];
+        this.update(child);
       }
     }
   }
@@ -228,7 +258,8 @@ export default class ImGuiWeb {
 
   /**
  * stackLayout will first check to see if all child elements have had thier layout calculated.
- * Then, it will grow to fit all children.
+ * Then, it will grow to fit all children. If the specified height is greater than the sum of the children,
+ * that will be preferred.
  * 
  * @param parent reference to parent container
  * @param self reference to self
@@ -268,6 +299,9 @@ export default class ImGuiWeb {
       self.calculatedHeight = heightSum;
       self.calculatedWidth = widthSum;
     }
+
+    self.calculatedHeight = Math.max(toPx(self.height), heightSum);
+    self.calculatedWidth = Math.max(toPx(self.width), widthSum);
 
     self.absRect = new Rect(parent.absRect.x1, parent.absRect.x1 + self.calculatedWidth, parent.absRect.y1, parent.absRect.y1 + self.calculatedHeight);
 

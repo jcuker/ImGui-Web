@@ -62,13 +62,18 @@ export function removeHTMLDivFromParent(parent: HTMLDivElement, div: HTMLDivElem
 
 export function convertImElementToHTMLDiv(element: ImElement): HTMLDivElement {
     const htmlDivElement = document.createElement('div');
+    element.htmlDivElement = htmlDivElement;
+    updateHTMLDiv(element);
+    return htmlDivElement;
+}
+
+export function updateHTMLDiv(element: ImElement): HTMLDivElement {
+    const htmlDivElement = element.htmlDivElement;
 
     const styleStr = constructSyleString(element);
 
     htmlDivElement.setAttribute('style', styleStr);
     htmlDivElement.setAttribute('id', element.id);
-
-    element.htmlDivElement = htmlDivElement;
 
     return htmlDivElement;
 }

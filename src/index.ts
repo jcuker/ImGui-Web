@@ -1,8 +1,8 @@
 import * as Stats from 'stats.js';
 import ImGuiWeb from './ImGui/ImGuiWeb';
-import { ImRectElementParams } from './ImGui/Elements/ImRectElement';
+import { onClickSwitch } from './ImGui/Examples/OnClickSwitch';
+import { appBaseLayout } from './ImGui/Examples/AppBaseLayout';
 import { constructSizeType } from './ImGui/Utils/ImGuiHelpers';
-import { ImElement } from './ImGui/Elements/ImElement';
 
 // TODO - type stats
 function setUpStats(): any {
@@ -19,12 +19,14 @@ function setUpStats(): any {
 }
 
 window.onload = () => {
-    const ImGuiInstance = new ImGuiWeb('root', { x: 100, y: 100 });
+    const height = 500;
+    const width = 500;
+
+    const ImGuiInstance = new ImGuiWeb('root', { x: 500, y: 500 });
 
     const stats = setUpStats();
 
     let playing = false;
-    let redFirst = true;
 
     const playbackControl = document.getElementById('playbackControl');
     playing ? playbackControl.textContent = 'Pause' : playbackControl.textContent = 'Play';
@@ -37,65 +39,14 @@ window.onload = () => {
         // TODO - explore framerate throttling
         stats.begin();
 
-        const redRectParams: ImRectElementParams = {
-            height: constructSizeType(25, 'px'),
-            width: constructSizeType(25, 'px'),
-            id: 'red',
-            backgroundColor: 'red'
-        };
-
-        const blueRectParams: ImRectElementParams = {
-            height: constructSizeType(25, 'px'),
-            width: constructSizeType(25, 'px'),
-            id: 'blue',
-            backgroundColor: 'blue'
-        };
-
-        const greenRectParams: ImRectElementParams = {
-            height: constructSizeType(25, 'px'),
-            width: constructSizeType(25, 'px'),
-            backgroundColor: 'green',
-            id: 'green'
-        };
-
         if (playing) {
+
             ImGuiInstance.begin();
-
-            ImGuiInstance.beginStack({
-                id: 'hStack',
-                height: constructSizeType(50, 'px'),
-                width: constructSizeType(50, 'px'),
-                orientation: 'vertical'
-            });
-
-            ImGuiInstance.beginStack({
-                id: 'nested-hStack',
-                height: constructSizeType(25, 'px'),
-                width: constructSizeType(50, 'px'),
-                orientation: 'horizontal',
-                backgroundColor: '#eee',
-                onClick: (element: ImElement) => {
-                    redFirst = !redFirst;
-                }
-            });
-
-            // shows how interactivity can be accomplished
-            if (redFirst) {
-                ImGuiInstance.rect(redRectParams);
-                ImGuiInstance.rect(blueRectParams);
-            } else {
-                ImGuiInstance.rect(blueRectParams);
-                ImGuiInstance.rect(redRectParams);
-            }
-
-            ImGuiInstance.endStack();
-
-            ImGuiInstance.rect(greenRectParams);
-
-            ImGuiInstance.endStack();
+            appBaseLayout(ImGuiInstance, constructSizeType(height, 'px'), constructSizeType(width, 'px'));
             ImGuiInstance.end();
-            stats.end();
+
         }
+        stats.end();
 
         requestAnimationFrame(mainLoop);
     }
