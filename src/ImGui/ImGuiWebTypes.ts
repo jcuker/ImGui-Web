@@ -55,6 +55,12 @@ export class Rect {
 
         return contains;
     }
+
+    public centerPoint(axis: 'x' | 'y'): number {
+        return axis === 'x'
+            ? (this.x1 + this.x2) / 2
+            : (this.y1 + this.y2) / 2;
+    }
 };
 
 export interface ImConfig {
@@ -72,3 +78,20 @@ export interface ImGuiState {
     // all unique ids
     idSet: string[];
 }
+
+export interface ImMargin {
+    top: SizeType;
+    left: SizeType;
+    right: SizeType;
+    bottom: SizeType;
+}
+
+export interface ImMarginParams {
+    top: SizeType | number;
+    left: SizeType | number;
+    right: SizeType | number;
+    bottom: SizeType | number;
+}
+
+export type HorizontalAlignment = 'LEFT' | 'CENTER' | 'RIGHT';
+export type VerticalAlignment = 'TOP' | 'CENTER' | 'BOTTOM';

@@ -1,9 +1,14 @@
-import { SizeType, Rect } from "../ImGuiWebTypes";
+import { ImMargin, Rect, SizeType, HorizontalAlignment, VerticalAlignment, ImMarginParams } from "../ImGuiWebTypes";
+import { constructSizeType } from "../Utils/ImGuiHelpers";
+import { DEFAULT_MARGINS } from "../Utils/Defaults";
 
 export interface ImElementParams {
     id: string;
-    height: SizeType;
-    width: SizeType;
+    height: SizeType | number;
+    width: SizeType | number;
+    margin?: ImMarginParams;
+    hAlign?: HorizontalAlignment;
+    vAlign?: VerticalAlignment;
     backgroundColor?: string;
     onClick?: OnClickFunctionPtr;
 }
@@ -23,6 +28,11 @@ export class ImElement {
     width: SizeType = { val: 0, unit: "px" };
     calculatedWidth?: number;
 
+    margin: ImMargin;
+
+    vAlign: VerticalAlignment = 'TOP';
+    hAlign: HorizontalAlignment = 'LEFT';
+
     hasPerformedLayout: boolean = false;
 
     backgroundColor?: string;
@@ -38,9 +48,22 @@ export class ImElement {
 
     constructor(params: ImElementParams) {
         this.id = params.id;
-        this.height = params.height;
-        this.width = params.width;
+        this.height = typeof params.height === 'number' ? constructSizeType(params.height, 'px') : params.height;
+        this.width = typeof params.width === 'number' ? constructSizeType(params.width, 'px') : params.width;
         this.backgroundColor = params.backgroundColor;
+
+        const margin = params.margin || DEFAULT_MARGINS;
+
+        this.margin = {
+            top: typeof margin.top === 'number' ? constructSizeType(margin.top, 'px') : margin.top,
+            bottom: typeof margin.bottom === 'number' ? constructSizeType(margin.bottom, 'px') : margin.bottom,
+            left: typeof margin.left === 'number' ? constructSizeType(margin.left, 'px') : margin.left,
+            right: typeof margin.right === 'number' ? constructSizeType(margin.right, 'px') : margin.right,
+        }
+
+        if (params.vAlign) this.vAlign = params.vAlign;
+        if (params.hAlign) this.hAlign = params.hAlign;
+
         this.onClick = params.onClick;
     }
 }

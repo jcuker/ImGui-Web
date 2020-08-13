@@ -303,7 +303,12 @@ export default class ImGuiWeb {
     self.calculatedHeight = Math.max(toPx(self.height), heightSum);
     self.calculatedWidth = Math.max(toPx(self.width), widthSum);
 
-    self.absRect = new Rect(parent.absRect.x1, parent.absRect.x1 + self.calculatedWidth, parent.absRect.y1, parent.absRect.y1 + self.calculatedHeight);
+    const x1 = parent.absRect.x1 + toPx(self.margin.left);
+    const x2 = parent.absRect.x1 + self.calculatedWidth - toPx(self.margin.right);
+    const y1 = parent.absRect.y1 + toPx(self.margin.top);
+    const y2 = parent.absRect.y1 + self.calculatedHeight - toPx(self.margin.bottom);
+
+    self.absRect = new Rect(x1, x2, y1, y2);
 
     self.hasPerformedLayout = true;
   }
@@ -315,7 +320,7 @@ export default class ImGuiWeb {
     }
 
     const rootHTMLElement = attemptedQuery as HTMLDivElement;
-    const style = rootHTMLElement.getAttribute('style');
+    const style = rootHTMLElement.getAttribute('style') || '';
     rootHTMLElement.setAttribute('style', style + `height: ${this.config.canvasSize.y}px; width: ${this.config.canvasSize.x}px;`);
 
     return rootHTMLElement;

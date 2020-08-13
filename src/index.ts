@@ -19,14 +19,14 @@ function setUpStats(): any {
 }
 
 window.onload = () => {
-    const height = 500;
-    const width = 500;
+    const height = 1000;
+    const width = 1000;
 
-    const ImGuiInstance = new ImGuiWeb('root', { x: 500, y: 500 });
+    const ImGuiInstance = new ImGuiWeb('root', { x: width, y: height });
 
     const stats = setUpStats();
 
-    let playing = false;
+    let playing = true;
 
     const playbackControl = document.getElementById('playbackControl');
     playing ? playbackControl.textContent = 'Pause' : playbackControl.textContent = 'Play';
@@ -42,7 +42,8 @@ window.onload = () => {
         if (playing) {
 
             ImGuiInstance.begin();
-            appBaseLayout(ImGuiInstance, constructSizeType(height, 'px'), constructSizeType(width, 'px'));
+            appBaseLayout(ImGuiInstance, constructSizeType(height / 2, 'px'), constructSizeType(width / 2, 'px'));
+            // onClickSwitch(ImGuiInstance);
             ImGuiInstance.end();
 
         }

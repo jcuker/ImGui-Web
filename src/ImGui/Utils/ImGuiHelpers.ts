@@ -1,5 +1,5 @@
 import { ImElement } from "../Elements/ImElement";
-import { SizeUnit, SizeType } from "../ImGuiWebTypes";
+import { SizeUnit, SizeType, ImMargin } from "../ImGuiWebTypes";
 
 export const constructSizeType = (val: number, unit: SizeUnit): SizeType => ({ val, unit });
 

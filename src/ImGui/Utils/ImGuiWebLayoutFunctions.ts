@@ -6,7 +6,53 @@ export function simpleLayout(parent: ImElement, self: ImElement): void {
     const width = toPx(self.width);
     const height = toPx(self.height);
 
-    self.absRect = new Rect(parent.absRect.x1, parent.absRect.x1 + width, parent.absRect.y1, parent.absRect.y1 + height);
+    let x1, x2, y1, y2;
+
+    switch (self.hAlign) {
+        default:
+        case 'LEFT':
+            x1 = parent.absRect.x1;
+            x2 = parent.absRect.x1 + width;
+            break;
+        case 'CENTER':
+            const centerOfParent = parent.absRect.centerPoint('x');
+            const halfWidth = width / 2;
+            x1 = centerOfParent - halfWidth;
+            x2 = centerOfParent + halfWidth;
+            break;
+        case 'RIGHT':
+            x1 = parent.absRect.x2 - width;
+            x2 = parent.absRect.x2;
+            break;
+    }
+
+    x1 += toPx(self.margin.left);
+    x2 -= toPx(self.margin.right);
+
+    switch (self.vAlign) {
+        default:
+        case 'TOP':
+            y1 = parent.absRect.y1;
+            y2 = parent.absRect.y1 + height;
+            break;
+        case 'CENTER':
+            const centerOfParent = parent.absRect.centerPoint('y');
+            const halfHeight = height / 2;
+            y1 = centerOfParent - halfHeight;
+            y2 = centerOfParent + halfHeight;
+            break;
+        case 'BOTTOM':
+            y1 = parent.absRect.y2 - height;
+            y2 = parent.absRect.y2;
+            break;
+
+    }
+
+    y1 += toPx(self.margin.top);
+    y2 -= toPx(self.margin.bottom);
+
+
+    self.absRect = new Rect(x1, x2, y1, y2);
 
     self.calculatedHeight = height;
     self.calculatedWidth = width;

@@ -11,6 +11,12 @@ export function appBaseLayout(imguiInstance: ImGuiWeb, height: SizeType, width: 
         height,
         width,
         orientation: 'vertical',
+        margin: {
+            top: constructSizeType(15, 'px'),
+            bottom: constructSizeType(0, 'px'),
+            left: constructSizeType(15, 'px'),
+            right: constructSizeType(0, 'px')
+        }
     }
 
     imguiInstance.beginStack(appParams);
@@ -30,6 +36,35 @@ function topBar(imguiInstance: ImGuiWeb, height: SizeType, width: SizeType) {
     }
 
     imguiInstance.beginStack(topBarParams);
+    imguiInstance.rect({
+        height: 25,
+        width: 25,
+        id: 'hamburger',
+        backgroundColor: 'teal',
+        hAlign: 'CENTER',
+        vAlign: 'CENTER',
+        margin: {
+            left: 0,
+            right: 5,
+            top: 0,
+            bottom: 0
+        }
+    });
+
+    imguiInstance.rect({
+        height: 25,
+        width: 25,
+        id: 'www',
+        backgroundColor: 'teal',
+        hAlign: 'CENTER',
+        vAlign: 'CENTER',
+        margin: {
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0
+        }
+    });
     imguiInstance.endStack();
 }
 
