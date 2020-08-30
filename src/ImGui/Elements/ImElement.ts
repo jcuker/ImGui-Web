@@ -20,7 +20,13 @@ export class ImElement {
     id: string;
     // index of the element within the elements array
     elementIdx: number = -1;
+
+
+    // abs rect is all the space an element will take up including margin and padding
     absRect: Rect = new Rect(0, 0, 0, 0);
+
+    // visible rect is the space only the visible parts of element will take up.  Essentially absRect - margin and padding
+    visibleRect: Rect = new Rect(0, 0, 0, 0);
 
     height: SizeType = { val: 0, unit: "px" };
     calculatedHeight?: number;

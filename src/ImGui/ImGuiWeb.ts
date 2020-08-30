@@ -309,6 +309,7 @@ export default class ImGuiWeb {
     const y2 = parent.absRect.y1 + self.calculatedHeight - toPx(self.margin.bottom);
 
     self.absRect = new Rect(x1, x2, y1, y2);
+    self.visibleRect = new Rect(x1, x2, y1, y2);
 
     self.hasPerformedLayout = true;
   }

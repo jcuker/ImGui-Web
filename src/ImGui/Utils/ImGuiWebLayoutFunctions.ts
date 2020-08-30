@@ -1,10 +1,13 @@
 import { ImElement } from "../Elements/ImElement";
 import toPx from "./ToPixel";
 import { Rect } from "../ImGuiWebTypes";
+import { calculateMargins } from "./ImGuiHelpers";
 
 export function simpleLayout(parent: ImElement, self: ImElement): void {
     const width = toPx(self.width);
     const height = toPx(self.height);
+
+    const calculatedMargins = calculateMargins(self.margin);
 
     let x1, x2, y1, y2;
 
@@ -26,9 +29,6 @@ export function simpleLayout(parent: ImElement, self: ImElement): void {
             break;
     }
 
-    x1 += toPx(self.margin.left);
-    x2 -= toPx(self.margin.right);
-
     switch (self.vAlign) {
         default:
         case 'TOP':
@@ -48,11 +48,9 @@ export function simpleLayout(parent: ImElement, self: ImElement): void {
 
     }
 
-    y1 += toPx(self.margin.top);
-    y2 -= toPx(self.margin.bottom);
+    self.absRect = new Rect(x1, x2 + calculatedMargins.left + calculatedMargins.right, y1, y2 + calculatedMargins.top + calculatedMargins.bottom);
 
-
-    self.absRect = new Rect(x1, x2, y1, y2);
+    self.visibleRect = new Rect(self.absRect.x1 + calculatedMargins.left, self.absRect.x2 - calculatedMargins.right, self.absRect.y1 + calculatedMargins.left, y2 - calculatedMargins.right);
 
     self.calculatedHeight = height;
     self.calculatedWidth = width;

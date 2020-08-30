@@ -1,15 +1,16 @@
 import { ImElement } from "../Elements/ImElement";
 import { SizeUnit, SizeType, ImMargin } from "../ImGuiWebTypes";
+import toPx from "./ToPixel";
 
 export const constructSizeType = (val: number, unit: SizeUnit): SizeType => ({ val, unit });
 
 export const constructSyleString = (element: ImElement): string => {
     let styleStr = `height: ${element.height.val}${element.height.unit}; width: ${element.width.val}${element.width.unit};position: absolute;`;
 
-    styleStr += `top: ${element.absRect.y1}px;`;
-    styleStr += `left: ${element.absRect.x1}px;`;
-    styleStr += `right: ${element.absRect.x2}px;`;
-    styleStr += `bottom: ${element.absRect.y2}px;`;
+    styleStr += `top: ${element.visibleRect.y1}px;`;
+    styleStr += `left: ${element.visibleRect.x1}px;`;
+    styleStr += `right: ${element.visibleRect.x2}px;`;
+    styleStr += `bottom: ${element.visibleRect.y2}px;`;
 
     if (element.backgroundColor) {
         styleStr += `background: ${element.backgroundColor};`;
@@ -76,4 +77,13 @@ export function updateHTMLDiv(element: ImElement): HTMLDivElement {
     htmlDivElement.setAttribute('id', element.id);
 
     return htmlDivElement;
+}
+
+export function calculateMargins(margins: ImMargin): { top: number, bottom: number, left: number, right: number } {
+    return {
+        top: toPx(margins.top),
+        bottom: toPx(margins.bottom),
+        left: toPx(margins.left),
+        right: toPx(margins.right)
+    };
 }
