@@ -10,7 +10,7 @@
     "webpack-dev-server": "^3.11.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/index.html dist/index.html",
     "prestart": "npm run build",
     "start": "webpack-dev-server --mode development"
   },

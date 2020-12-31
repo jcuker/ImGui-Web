@@ -1,28 +1,28 @@
-const path = require('path');
+const path = require("path");
 
 module.exports = {
-  entry: './src/index.ts',
-  devtool: 'source-map',
+  entry: "./src/index.ts",
+  devtool: "source-map",
   module: {
     rules: [
       {
         test: /\.ts?$/,
-        use: 'ts-loader',
+        use: "ts-loader",
         exclude: /node_modules/,
       },
     ],
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
+    extensions: [".tsx", ".ts", ".js"],
   },
   output: {
-    filename: 'bundle.js',
-    path: path.resolve(__dirname, 'dist'),
+    filename: "bundle.js",
+    path: path.resolve(__dirname, "dist"),
   },
   watch: true,
   watchOptions: {
     aggregateTimeout: 200,
-    poll: 1000
+    poll: 1000,
   },
   devServer: {
     // Display only errors to reduce the amount of output.
@@ -39,6 +39,6 @@ module.exports = {
     port: process.env.PORT, // Defaults to 8080
     open: true, // Open the page in browser
     overlay: true,
-    contentBase: path.join(__dirname, 'dist'),
+    contentBase: path.join(__dirname, "dist"),
   },
 };
